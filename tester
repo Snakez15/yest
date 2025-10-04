@@ -57,47 +57,87 @@ local function addSlider(label, min, max, default, callback)
         if val then
             val = math.clamp(val, min, max)
             slider.Text = tostring(val)
-            local flyConn
-            local flyMethod = Methods.Fly or "Bypass"
-            local function startFly(char)
-                if flyConn then flyConn:Disconnect() end
-                local hrp = char:FindFirstChild("HumanoidRootPart")
-                local hum = char:FindFirstChild("Humanoid")
-                if not hrp or not hum then return end
-                hum.PlatformStand = true
-                flyConn = run.RenderStepped:Connect(function()
-                    if not hrp or not hrp.Parent or not hum or not hum.Parent then return end
-                    local flyspeed = (flyMethod == "Bypass") and 1.5 or 1.0
-                    local move = Vector3.new(0, 0, 0)
-                    local moved = false
-                    if input:IsKeyDown(Enum.KeyCode.W) then move = move + (camera.CFrame.LookVector * flyspeed); moved = true end
-                    if input:IsKeyDown(Enum.KeyCode.S) then move = move - (camera.CFrame.LookVector * flyspeed); moved = true end
-                    if input:IsKeyDown(Enum.KeyCode.A) then move = move - (camera.CFrame.RightVector * flyspeed); moved = true end
-                    if input:IsKeyDown(Enum.KeyCode.D) then move = move + (camera.CFrame.RightVector * flyspeed); moved = true end
-                    if moved then
+        else
+            slider.Text = tostring(default)
+        end
+    end)
+
+    -- Fly bypass method logic
+    if label == "Fly" then
+        local flyConn
+        local flyMethod = Methods.Fly or "Bypass"
+        local function startFly(char)
+            if flyConn then flyConn:Disconnect() end
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            local hum = char:FindFirstChild("Humanoid")
+            if not hrp or not hum then return end
+            hum.PlatformStand = true
+            flyConn = run.RenderStepped:Connect(function()
+                if not hrp or not hrp.Parent or not hum or not hum.Parent then return end
+                local flyspeed = (flyMethod == "Bypass") and 1.5 or 1.0
+                local move = Vector3.new(0, 0, 0)
+                local moved = false
+                if input:IsKeyDown(Enum.KeyCode.W) then move = move + (camera.CFrame.LookVector * flyspeed); moved = true end
+                if input:IsKeyDown(Enum.KeyCode.S) then move = move - (camera.CFrame.LookVector * flyspeed); moved = true end
+                if input:IsKeyDown(Enum.KeyCode.A) then move = move - (camera.CFrame.RightVector * flyspeed); moved = true end
+                if input:IsKeyDown(Enum.KeyCode.D) then move = move + (camera.CFrame.RightVector * flyspeed); moved = true end
+                if moved then
+                    if flyMethod == "Bypass" then
                         hrp.CFrame = hrp.CFrame + move
+                    elseif flyMethod == "Velocity" then
+                        hrp.Velocity = move * 10
                     end
-                end)
-            end
-            local function enableFly()
-                if me.Character then
-                    startFly(me.Character)
                 end
-                me.CharacterAdded:Connect(function(char)
-                    repeat wait() until char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid")
-                    startFly(char)
-                end)
-            end
-            local function disableFly()
-                if flyConn then flyConn:Disconnect() end
-                flyConn = nil
-                if me.Character and me.Character:FindFirstChild("Humanoid") then
-                    me.Character.Humanoid.PlatformStand = false
-                end
-            end
-            addToggle("Fly", false, function(enabled)
-                if enabled then enableFly() else disableFly() end
             end)
+        end
+        local function enableFly()
+            if me.Character then
+                startFly(me.Character)
+            end
+            me.CharacterAdded:Connect(function(char)
+                repeat wait() until char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid")
+                startFly(char)
+            end)
+        end
+        local function disableFly()
+            if flyConn then flyConn:Disconnect() end
+            flyConn = nil
+            if me.Character and me.Character:FindFirstChild("Humanoid") then
+                me.Character.Humanoid.PlatformStand = false
+            end
+            if me.Character and me.Character:FindFirstChild("HumanoidRootPart") then
+                me.Character.HumanoidRootPart.Velocity = Vector3.new(0,0,0)
+            end
+        end
+        addToggle("Fly", false, function(enabled)
+            if enabled then enableFly() else disableFly() end
+        end)
+
+        -- Fly method dropdown
+        local flyMethodFrame = Instance.new("Frame")
+        flyMethodFrame.Parent = MainFrame
+        flyMethodFrame.Size = UDim2.new(1, -20, 0, 32)
+        flyMethodFrame.BackgroundTransparency = 1
+        local flyMethodLabel = Instance.new("TextLabel")
+        flyMethodLabel.Parent = flyMethodFrame
+        flyMethodLabel.Size = UDim2.new(0.5, -8, 1, 0)
+        flyMethodLabel.Position = UDim2.new(0, 8, 0, 0)
+        flyMethodLabel.BackgroundTransparency = 1
+        flyMethodLabel.Text = "Fly Method"
+        flyMethodLabel.TextColor3 = Color3.new(1, 1, 1)
+        flyMethodLabel.TextXAlignment = Enum.TextXAlignment.Left
+        local flyMethodDropdown = Instance.new("TextButton")
+        flyMethodDropdown.Parent = flyMethodFrame
+        flyMethodDropdown.Size = UDim2.new(0.5, -8, 1, 0)
+        flyMethodDropdown.Position = UDim2.new(0.5, 8, 0, 0)
+        flyMethodDropdown.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        flyMethodDropdown.Text = flyMethod
+        flyMethodDropdown.TextColor3 = Color3.new(1, 1, 1)
+        flyMethodDropdown.MouseButton1Click:Connect(function()
+            flyMethod = (flyMethod == "Bypass") and "Velocity" or "Bypass"
+            flyMethodDropdown.Text = flyMethod
+        end)
+    end
 
 -- FOV Slider
 addSlider("FOV", 70, 120, camera.FieldOfView, function(val)
