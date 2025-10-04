@@ -57,44 +57,47 @@ local function addSlider(label, min, max, default, callback)
         if val then
             val = math.clamp(val, min, max)
             slider.Text = tostring(val)
-            callback(val)
-        else
-            slider.Text = tostring(default)
-        end
-    end)
-end
-
-local function addToggle(label, default, callback)
-    local frame = Instance.new("Frame")
-    frame.Parent = MainFrame
-    frame.Size = UDim2.new(1, -20, 0, 32)
-    frame.BackgroundTransparency = 1
-
-    local text = Instance.new("TextLabel")
-    text.Parent = frame
-    text.Size = UDim2.new(0.7, -8, 1, 0)
-    text.Position = UDim2.new(0, 8, 0, 0)
-    text.BackgroundTransparency = 1
-    text.Text = label
-    text.TextColor3 = Color3.new(1, 1, 1)
-    text.TextXAlignment = Enum.TextXAlignment.Left
-
-    local button = Instance.new("TextButton")
-    button.Parent = frame
-    button.Size = UDim2.new(0.3, -8, 1, 0)
-    button.Position = UDim2.new(0.7, 8, 0, 0)
-    button.BackgroundColor3 = default and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
-    button.Text = default and "ON" or "OFF"
-    button.TextColor3 = Color3.new(1, 1, 1)
-
-    local state = default
-    button.MouseButton1Click:Connect(function()
-        state = not state
-        button.BackgroundColor3 = state and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
-        button.Text = state and "ON" or "OFF"
-        callback(state)
-    end)
-end
+            local flyConn
+            local flyMethod = Methods.Fly or "Bypass"
+            local function startFly(char)
+                if flyConn then flyConn:Disconnect() end
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                local hum = char:FindFirstChild("Humanoid")
+                if not hrp or not hum then return end
+                hum.PlatformStand = true
+                flyConn = run.RenderStepped:Connect(function()
+                    if not hrp or not hrp.Parent or not hum or not hum.Parent then return end
+                    local flyspeed = (flyMethod == "Bypass") and 1.5 or 1.0
+                    local move = Vector3.new(0, 0, 0)
+                    local moved = false
+                    if input:IsKeyDown(Enum.KeyCode.W) then move = move + (camera.CFrame.LookVector * flyspeed); moved = true end
+                    if input:IsKeyDown(Enum.KeyCode.S) then move = move - (camera.CFrame.LookVector * flyspeed); moved = true end
+                    if input:IsKeyDown(Enum.KeyCode.A) then move = move - (camera.CFrame.RightVector * flyspeed); moved = true end
+                    if input:IsKeyDown(Enum.KeyCode.D) then move = move + (camera.CFrame.RightVector * flyspeed); moved = true end
+                    if moved then
+                        hrp.CFrame = hrp.CFrame + move
+                    end
+                end)
+            end
+            local function enableFly()
+                if me.Character then
+                    startFly(me.Character)
+                end
+                me.CharacterAdded:Connect(function(char)
+                    repeat wait() until char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid")
+                    startFly(char)
+                end)
+            end
+            local function disableFly()
+                if flyConn then flyConn:Disconnect() end
+                flyConn = nil
+                if me.Character and me.Character:FindFirstChild("Humanoid") then
+                    me.Character.Humanoid.PlatformStand = false
+                end
+            end
+            addToggle("Fly", false, function(enabled)
+                if enabled then enableFly() else disableFly() end
+            end)
 
 -- FOV Slider
 addSlider("FOV", 70, 120, camera.FieldOfView, function(val)
