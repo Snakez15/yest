@@ -1,4 +1,9 @@
 -- Player Controls GUI
+local Methods = {
+    Fly = "Bypass",
+    Infstamina = "Getgc"
+}
+
 local plrs = game:GetService("Players")
 local me = plrs.LocalPlayer
 local run = game:GetService("RunService")
