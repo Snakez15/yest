@@ -1,0 +1,216 @@
+-- Player Controls GUI
+local plrs = game:GetService("Players")
+local me = plrs.LocalPlayer
+local run = game:GetService("RunService")
+local input = game:GetService("UserInputService")
+local camera = workspace.CurrentCamera
+local rp = game:GetService("ReplicatedStorage")
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = game.CoreGui
+ScreenGui.Name = "PlayerControlsGUI"
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Parent = ScreenGui
+MainFrame.Size = UDim2.new(0, 320, 0, 480)
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -240)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+
+local UIList = Instance.new("UIListLayout")
+UIList.Parent = MainFrame
+UIList.Padding = UDim.new(0, 10)
+UIList.FillDirection = Enum.FillDirection.Vertical
+UIList.SortOrder = Enum.SortOrder.LayoutOrder
+
+local function addSlider(label, min, max, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Parent = MainFrame
+    frame.Size = UDim2.new(1, -20, 0, 40)
+    frame.BackgroundTransparency = 1
+
+    local text = Instance.new("TextLabel")
+    text.Parent = frame
+    text.Size = UDim2.new(0.5, -8, 1, 0)
+    text.Position = UDim2.new(0, 8, 0, 0)
+    text.BackgroundTransparency = 1
+    text.Text = label
+    text.TextColor3 = Color3.new(1, 1, 1)
+    text.TextXAlignment = Enum.TextXAlignment.Left
+
+    local slider = Instance.new("TextBox")
+    slider.Parent = frame
+    slider.Size = UDim2.new(0.5, -8, 1, 0)
+    slider.Position = UDim2.new(0.5, 8, 0, 0)
+    slider.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    slider.Text = tostring(default)
+    slider.TextColor3 = Color3.new(1, 1, 1)
+    slider.ClearTextOnFocus = false
+
+    slider.FocusLost:Connect(function()
+        local val = tonumber(slider.Text)
+        if val then
+            val = math.clamp(val, min, max)
+            slider.Text = tostring(val)
+            callback(val)
+        else
+            slider.Text = tostring(default)
+        end
+    end)
+end
+
+local function addToggle(label, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Parent = MainFrame
+    frame.Size = UDim2.new(1, -20, 0, 32)
+    frame.BackgroundTransparency = 1
+
+    local text = Instance.new("TextLabel")
+    text.Parent = frame
+    text.Size = UDim2.new(0.7, -8, 1, 0)
+    text.Position = UDim2.new(0, 8, 0, 0)
+    text.BackgroundTransparency = 1
+    text.Text = label
+    text.TextColor3 = Color3.new(1, 1, 1)
+    text.TextXAlignment = Enum.TextXAlignment.Left
+
+    local button = Instance.new("TextButton")
+    button.Parent = frame
+    button.Size = UDim2.new(0.3, -8, 1, 0)
+    button.Position = UDim2.new(0.7, 8, 0, 0)
+    button.BackgroundColor3 = default and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
+    button.Text = default and "ON" or "OFF"
+    button.TextColor3 = Color3.new(1, 1, 1)
+
+    local state = default
+    button.MouseButton1Click:Connect(function()
+        state = not state
+        button.BackgroundColor3 = state and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
+        button.Text = state and "ON" or "OFF"
+        callback(state)
+    end)
+end
+
+-- FOV Slider
+addSlider("FOV", 70, 120, camera.FieldOfView, function(val)
+    camera.FieldOfView = val
+end)
+
+-- Camera Distance Slider
+addSlider("Camera Distance", 10, 500, me.CameraMaxZoomDistance, function(val)
+    me.CameraMaxZoomDistance = val
+end)
+
+-- Jump Slider
+addSlider("Jump Height", 7.1, 25, 7.1, function(val)
+    if me.Character and me.Character:FindFirstChild("Humanoid") then
+        me.Character.Humanoid.UseJumpPower = false
+        me.Character.Humanoid.JumpHeight = val
+    end
+end)
+
+-- Gravity Slider
+addSlider("Gravity", workspace.Gravity, 75, workspace.Gravity, function(val)
+    workspace.Gravity = val
+end)
+
+-- Fly Toggle with Method Selector
+local flyConn, flyBodyVel
+local flyMethod = "Bypass"
+addToggle("Fly", false, function(enabled)
+    if enabled then
+        if me.Character and me.Character:FindFirstChild("HumanoidRootPart") then
+            flyBodyVel = Instance.new("BodyVelocity")
+            flyBodyVel.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+            flyBodyVel.Velocity = Vector3.new(0, 0, 0)
+            flyBodyVel.Parent = me.Character.HumanoidRootPart
+            flyConn = run.RenderStepped:Connect(function()
+                local vel = Vector3.new(0, 0, 0)
+                local flyspeed = (flyMethod == "Bypass") and 60 or 40
+                if input:IsKeyDown(Enum.KeyCode.W) then vel = vel + (camera.CFrame.LookVector * flyspeed) end
+                if input:IsKeyDown(Enum.KeyCode.S) then vel = vel - (camera.CFrame.LookVector * flyspeed) end
+                if input:IsKeyDown(Enum.KeyCode.A) then vel = vel - (camera.CFrame.RightVector * flyspeed) end
+                if input:IsKeyDown(Enum.KeyCode.D) then vel = vel + (camera.CFrame.RightVector * flyspeed) end
+                flyBodyVel.Velocity = vel
+                if flyMethod == "Bypass" then
+                    local event = rp:FindFirstChild("Events") and rp.Events:FindFirstChild("__RZDONL")
+                    if event then event:FireServer("__---r", Vector3.new(0, 0, 0), me.Character.HumanoidRootPart.CFrame, false) end
+                end
+            end)
+        end
+    else
+        if flyBodyVel then flyBodyVel:Destroy() end
+        flyBodyVel = nil
+        if flyConn then flyConn:Disconnect() end
+        flyConn = nil
+    end
+end)
+
+-- Fly Method Dropdown
+local flyMethodFrame = Instance.new("Frame")
+flyMethodFrame.Parent = MainFrame
+flyMethodFrame.Size = UDim2.new(1, -20, 0, 32)
+flyMethodFrame.BackgroundTransparency = 1
+local flyMethodLabel = Instance.new("TextLabel")
+flyMethodLabel.Parent = flyMethodFrame
+flyMethodLabel.Size = UDim2.new(0.5, -8, 1, 0)
+flyMethodLabel.Position = UDim2.new(0, 8, 0, 0)
+flyMethodLabel.BackgroundTransparency = 1
+flyMethodLabel.Text = "Fly Method"
+flyMethodLabel.TextColor3 = Color3.new(1, 1, 1)
+flyMethodLabel.TextXAlignment = Enum.TextXAlignment.Left
+local flyMethodDropdown = Instance.new("TextButton")
+flyMethodDropdown.Parent = flyMethodFrame
+flyMethodDropdown.Size = UDim2.new(0.5, -8, 1, 0)
+flyMethodDropdown.Position = UDim2.new(0.5, 8, 0, 0)
+flyMethodDropdown.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+flyMethodDropdown.Text = flyMethod
+flyMethodDropdown.TextColor3 = Color3.new(1, 1, 1)
+flyMethodDropdown.MouseButton1Click:Connect(function()
+    flyMethod = (flyMethod == "Bypass") and "Velocity" or "Bypass"
+    flyMethodDropdown.Text = flyMethod
+end)
+
+-- Infinite Stamina Toggle
+addToggle("Infinite Stamina", false, function(enabled)
+    -- Implement stamina logic here
+end)
+
+-- No Fall Damage Toggle
+addToggle("No Fall Damage", false, function(enabled)
+    -- Implement no fall damage logic here
+end)
+
+-- Noclip Toggle
+local noclipConn
+addToggle("Noclip", false, function(enabled)
+    if enabled then
+        noclipConn = run.RenderStepped:Connect(function()
+            if me.Character then
+                for _, part in pairs(me.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end)
+    else
+        if noclipConn then noclipConn:Disconnect() end
+        noclipConn = nil
+    end
+end)
+
+-- Fake Down Toggle
+addToggle("Fake Down", false, function(enabled)
+    -- Implement fake down logic here
+end)
+
+-- Stop Neck Move Toggle
+addToggle("Stop Neck Move", false, function(enabled)
+    -- Implement stop neck move logic here
+end)
+
+-- Unbreak Limbs Toggle
+addToggle("Unbreak Limbs", false, function(enabled)
+    -- Implement unbreak limbs logic here
+end)
