@@ -117,33 +117,49 @@ end)
 -- Fly Toggle with Method Selector
 local flyConn, flyBodyVel
 local flyMethod = "Bypass"
-addToggle("Fly", false, function(enabled)
-    if enabled then
-        if me.Character and me.Character:FindFirstChild("HumanoidRootPart") then
-            flyBodyVel = Instance.new("BodyVelocity")
-            flyBodyVel.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-            flyBodyVel.Velocity = Vector3.new(0, 0, 0)
-            flyBodyVel.Parent = me.Character.HumanoidRootPart
-            flyConn = run.RenderStepped:Connect(function()
-                local vel = Vector3.new(0, 0, 0)
-                local flyspeed = (flyMethod == "Bypass") and 60 or 40
-                if input:IsKeyDown(Enum.KeyCode.W) then vel = vel + (camera.CFrame.LookVector * flyspeed) end
-                if input:IsKeyDown(Enum.KeyCode.S) then vel = vel - (camera.CFrame.LookVector * flyspeed) end
-                if input:IsKeyDown(Enum.KeyCode.A) then vel = vel - (camera.CFrame.RightVector * flyspeed) end
-                if input:IsKeyDown(Enum.KeyCode.D) then vel = vel + (camera.CFrame.RightVector * flyspeed) end
-                flyBodyVel.Velocity = vel
-                if flyMethod == "Bypass" then
-                    local event = rp:FindFirstChild("Events") and rp.Events:FindFirstChild("__RZDONL")
-                    if event then event:FireServer("__---r", Vector3.new(0, 0, 0), me.Character.HumanoidRootPart.CFrame, false) end
-                end
-            end)
-        end
-    else
+local function enableFly()
+    local function startFly(char)
         if flyBodyVel then flyBodyVel:Destroy() end
-        flyBodyVel = nil
         if flyConn then flyConn:Disconnect() end
-        flyConn = nil
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        flyBodyVel = Instance.new("BodyVelocity")
+        flyBodyVel.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+        flyBodyVel.Velocity = Vector3.new(0, 0, 0)
+        flyBodyVel.Parent = hrp
+        flyConn = run.RenderStepped:Connect(function()
+            if not hrp or not hrp.Parent then return end
+            local vel = Vector3.new(0, 0, 0)
+            local flyspeed = (flyMethod == "Bypass") and 60 or 40
+            if input:IsKeyDown(Enum.KeyCode.W) then vel = vel + (camera.CFrame.LookVector * flyspeed) end
+            if input:IsKeyDown(Enum.KeyCode.S) then vel = vel - (camera.CFrame.LookVector * flyspeed) end
+            if input:IsKeyDown(Enum.KeyCode.A) then vel = vel - (camera.CFrame.RightVector * flyspeed) end
+            if input:IsKeyDown(Enum.KeyCode.D) then vel = vel + (camera.CFrame.RightVector * flyspeed) end
+            flyBodyVel.Velocity = vel
+            if flyMethod == "Bypass" then
+                local event = rp:FindFirstChild("Events") and rp.Events:FindFirstChild("__RZDONL")
+                if event then pcall(function()
+                    event:FireServer("__---r", Vector3.new(0, 0, 0), hrp.CFrame, false)
+                end) end
+            end
+        end)
     end
+    if me.Character then
+        startFly(me.Character)
+    end
+    me.CharacterAdded:Connect(function(char)
+        repeat wait() until char:FindFirstChild("HumanoidRootPart")
+        startFly(char)
+    end)
+end
+local function disableFly()
+    if flyBodyVel then flyBodyVel:Destroy() end
+    flyBodyVel = nil
+    if flyConn then flyConn:Disconnect() end
+    flyConn = nil
+end
+addToggle("Fly", false, function(enabled)
+    if enabled then enableFly() else disableFly() end
 end)
 
 -- Fly Method Dropdown
@@ -172,13 +188,48 @@ flyMethodDropdown.MouseButton1Click:Connect(function()
 end)
 
 -- Infinite Stamina Toggle
+local infStaminaConn
 addToggle("Infinite Stamina", false, function(enabled)
-    -- Implement stamina logic here
+    if enabled then
+        infStaminaConn = run.RenderStepped:Connect(function()
+            if me.Character and me.Character:FindFirstChild("Humanoid") then
+                me.Character.Humanoid:SetAttribute("ZSPRN_M", true)
+            end
+        end)
+    else
+        if infStaminaConn then infStaminaConn:Disconnect() end
+        infStaminaConn = nil
+        if me.Character and me.Character:FindFirstChild("Humanoid") then
+            me.Character.Humanoid:SetAttribute("ZSPRN_M", nil)
+        end
+    end
 end)
 
 -- No Fall Damage Toggle
+local noFallConn
 addToggle("No Fall Damage", false, function(enabled)
-    -- Implement no fall damage logic here
+    if enabled then
+        if me.Character then
+            local ff = Instance.new("ForceField")
+            ff.Parent = me.Character
+            ff.Visible = false
+        end
+        noFallConn = me.CharacterAdded:Connect(function(char)
+            local ff = Instance.new("ForceField")
+            ff.Parent = char
+            ff.Visible = false
+        end)
+    else
+        if me.Character then
+            for _, a in pairs(me.Character:GetChildren()) do
+                if a:IsA("ForceField") and a.Visible == false then
+                    a:Destroy()
+                end
+            end
+        end
+        if noFallConn then noFallConn:Disconnect() end
+        noFallConn = nil
+    end
 end)
 
 -- Noclip Toggle
@@ -202,15 +253,29 @@ end)
 
 -- Fake Down Toggle
 addToggle("Fake Down", false, function(enabled)
-    -- Implement fake down logic here
+    -- Placeholder: No crash
 end)
 
 -- Stop Neck Move Toggle
+local neckConn
 addToggle("Stop Neck Move", false, function(enabled)
-    -- Implement stop neck move logic here
+    if enabled then
+        if me.Character then
+            me.Character:SetAttribute("NoNeckMovement", true)
+        end
+        neckConn = me.CharacterAdded:Connect(function(char)
+            char:SetAttribute("NoNeckMovement", true)
+        end)
+    else
+        if me.Character then
+            me.Character:SetAttribute("NoNeckMovement", nil)
+        end
+        if neckConn then neckConn:Disconnect() end
+        neckConn = nil
+    end
 end)
 
 -- Unbreak Limbs Toggle
 addToggle("Unbreak Limbs", false, function(enabled)
-    -- Implement unbreak limbs logic here
+    -- Placeholder: No crash
 end)
