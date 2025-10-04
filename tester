@@ -1,9 +1,5 @@
+@@ -0,0 +1,216 @@
 -- Player Controls GUI
-local Methods = {
-    Fly = "Bypass",
-    Infstamina = "Getgc"
-}
-
 local plrs = game:GetService("Players")
 local me = plrs.LocalPlayer
 local run = game:GetService("RunService")
@@ -27,6 +23,80 @@ UIList.Parent = MainFrame
 UIList.Padding = UDim.new(0, 10)
 UIList.FillDirection = Enum.FillDirection.Vertical
 UIList.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- Fly Button and Method Selector
+local MakeFlyButton = Instance.new("TextButton")
+MakeFlyButton.Parent = MainFrame
+MakeFlyButton.Size = UDim2.new(1, -20, 0, 40)
+MakeFlyButton.BackgroundColor3 = Color3.fromRGB(50, 50, 120)
+MakeFlyButton.Text = "Fly"
+MakeFlyButton.TextColor3 = Color3.new(1, 1, 1)
+
+local flyMethod = Methods.Fly or "Bypass"
+local flyspeed = 60
+local flyConn
+
+local function fly(hrp)
+    if hrp and _G.FlyEnabled then
+        if flyConn then flyConn:Disconnect() end
+        flyConn = run.RenderStepped:Connect(function()
+            local moveVector = Vector3.new(0, 0, 0)
+            if input:IsKeyDown(Enum.KeyCode.W) then
+                moveVector = moveVector + (camera.CoordinateFrame.lookVector * flyspeed)
+            end
+            if input:IsKeyDown(Enum.KeyCode.S) then
+                moveVector = moveVector - (camera.CoordinateFrame.lookVector * flyspeed)
+            end
+            if input:IsKeyDown(Enum.KeyCode.A) then
+                moveVector = moveVector - (camera.CoordinateFrame.rightVector * flyspeed)
+            end
+            if input:IsKeyDown(Enum.KeyCode.D) then
+                moveVector = moveVector + (camera.CoordinateFrame.rightVector * flyspeed)
+            end
+            hrp.Velocity = moveVector
+            if flyMethod == "Bypass" then
+                local event = rp:FindFirstChild("Events") and rp.Events:FindFirstChild("__RZDONL")
+                if event then event:FireServer("__---r", Vector3.new(0, 0, 0), hrp.CFrame, false) end
+                flyspeed = 60
+            elseif flyMethod == "Velocity" then
+                flyspeed = 40
+            end
+        end)
+    else
+        if flyConn then flyConn:Disconnect(); flyConn = nil end
+        if hrp then hrp.Velocity = Vector3.new(0, 0, 0) end
+    end
+end
+
+MakeFlyButton.MouseButton1Click:Connect(function()
+    _G.FlyEnabled = not _G.FlyEnabled
+    MakeFlyButton.BackgroundColor3 = _G.FlyEnabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(50, 50, 120)
+    local char = me.Character
+    if _G.FlyEnabled then
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            fly(char:FindFirstChild("HumanoidRootPart"))
+        end
+        me.CharacterAdded:Connect(function(newchar)
+            repeat wait() until newchar and newchar:FindFirstChild("HumanoidRootPart")
+            fly(newchar:FindFirstChild("HumanoidRootPart"))
+        end)
+    else
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            fly(char:FindFirstChild("HumanoidRootPart"))
+        end
+    end
+end)
+
+local MakeFlyMethodSelector = Instance.new("TextButton")
+MakeFlyMethodSelector.Parent = MainFrame
+MakeFlyMethodSelector.Size = UDim2.new(1, -20, 0, 32)
+MakeFlyMethodSelector.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+MakeFlyMethodSelector.Text = "Fly Method: " .. flyMethod
+MakeFlyMethodSelector.TextColor3 = Color3.new(1, 1, 1)
+MakeFlyMethodSelector.MouseButton1Click:Connect(function()
+    flyMethod = (flyMethod == "Bypass") and "Velocity" or "Bypass"
+    MakeFlyMethodSelector.Text = "Fly Method: " .. flyMethod
+end)
 
 local function addSlider(label, min, max, default, callback)
     local frame = Instance.new("Frame")
@@ -57,87 +127,44 @@ local function addSlider(label, min, max, default, callback)
         if val then
             val = math.clamp(val, min, max)
             slider.Text = tostring(val)
+            callback(val)
         else
             slider.Text = tostring(default)
         end
     end)
+end
 
-    -- Fly bypass method logic
-    if label == "Fly" then
-        local flyConn
-        local flyMethod = Methods.Fly or "Bypass"
-        local function startFly(char)
-            if flyConn then flyConn:Disconnect() end
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            local hum = char:FindFirstChild("Humanoid")
-            if not hrp or not hum then return end
-            hum.PlatformStand = true
-            flyConn = run.RenderStepped:Connect(function()
-                if not hrp or not hrp.Parent or not hum or not hum.Parent then return end
-                local flyspeed = (flyMethod == "Bypass") and 1.5 or 1.0
-                local move = Vector3.new(0, 0, 0)
-                local moved = false
-                if input:IsKeyDown(Enum.KeyCode.W) then move = move + (camera.CFrame.LookVector * flyspeed); moved = true end
-                if input:IsKeyDown(Enum.KeyCode.S) then move = move - (camera.CFrame.LookVector * flyspeed); moved = true end
-                if input:IsKeyDown(Enum.KeyCode.A) then move = move - (camera.CFrame.RightVector * flyspeed); moved = true end
-                if input:IsKeyDown(Enum.KeyCode.D) then move = move + (camera.CFrame.RightVector * flyspeed); moved = true end
-                if moved then
-                    if flyMethod == "Bypass" then
-                        hrp.CFrame = hrp.CFrame + move
-                    elseif flyMethod == "Velocity" then
-                        hrp.Velocity = move * 10
-                    end
-                end
-            end)
-        end
-        local function enableFly()
-            if me.Character then
-                startFly(me.Character)
-            end
-            me.CharacterAdded:Connect(function(char)
-                repeat wait() until char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid")
-                startFly(char)
-            end)
-        end
-        local function disableFly()
-            if flyConn then flyConn:Disconnect() end
-            flyConn = nil
-            if me.Character and me.Character:FindFirstChild("Humanoid") then
-                me.Character.Humanoid.PlatformStand = false
-            end
-            if me.Character and me.Character:FindFirstChild("HumanoidRootPart") then
-                me.Character.HumanoidRootPart.Velocity = Vector3.new(0,0,0)
-            end
-        end
-        addToggle("Fly", false, function(enabled)
-            if enabled then enableFly() else disableFly() end
-        end)
+local function addToggle(label, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Parent = MainFrame
+    frame.Size = UDim2.new(1, -20, 0, 32)
+    frame.BackgroundTransparency = 1
 
-        -- Fly method dropdown
-        local flyMethodFrame = Instance.new("Frame")
-        flyMethodFrame.Parent = MainFrame
-        flyMethodFrame.Size = UDim2.new(1, -20, 0, 32)
-        flyMethodFrame.BackgroundTransparency = 1
-        local flyMethodLabel = Instance.new("TextLabel")
-        flyMethodLabel.Parent = flyMethodFrame
-        flyMethodLabel.Size = UDim2.new(0.5, -8, 1, 0)
-        flyMethodLabel.Position = UDim2.new(0, 8, 0, 0)
-        flyMethodLabel.BackgroundTransparency = 1
-        flyMethodLabel.Text = "Fly Method"
-        flyMethodLabel.TextColor3 = Color3.new(1, 1, 1)
-        flyMethodLabel.TextXAlignment = Enum.TextXAlignment.Left
-        local flyMethodDropdown = Instance.new("TextButton")
-        flyMethodDropdown.Parent = flyMethodFrame
-        flyMethodDropdown.Size = UDim2.new(0.5, -8, 1, 0)
-        flyMethodDropdown.Position = UDim2.new(0.5, 8, 0, 0)
-        flyMethodDropdown.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        flyMethodDropdown.Text = flyMethod
-        flyMethodDropdown.TextColor3 = Color3.new(1, 1, 1)
-        flyMethodDropdown.MouseButton1Click:Connect(function()
-            flyMethod = (flyMethod == "Bypass") and "Velocity" or "Bypass"
-            flyMethodDropdown.Text = flyMethod
-        end)
-    end
+    local text = Instance.new("TextLabel")
+    text.Parent = frame
+    text.Size = UDim2.new(0.7, -8, 1, 0)
+    text.Position = UDim2.new(0, 8, 0, 0)
+    text.BackgroundTransparency = 1
+    text.Text = label
+    text.TextColor3 = Color3.new(1, 1, 1)
+    text.TextXAlignment = Enum.TextXAlignment.Left
+
+    local button = Instance.new("TextButton")
+    button.Parent = frame
+    button.Size = UDim2.new(0.3, -8, 1, 0)
+    button.Position = UDim2.new(0.7, 8, 0, 0)
+    button.BackgroundColor3 = default and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
+    button.Text = default and "ON" or "OFF"
+    button.TextColor3 = Color3.new(1, 1, 1)
+
+    local state = default
+    button.MouseButton1Click:Connect(function()
+        state = not state
+        button.BackgroundColor3 = state and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
+        button.Text = state and "ON" or "OFF"
+        callback(state)
+    end)
+end
 
 -- FOV Slider
 addSlider("FOV", 70, 120, camera.FieldOfView, function(val)
@@ -165,49 +192,33 @@ end)
 -- Fly Toggle with Method Selector
 local flyConn, flyBodyVel
 local flyMethod = "Bypass"
-local function enableFly()
-    local function startFly(char)
-        if flyBodyVel then flyBodyVel:Destroy() end
-        if flyConn then flyConn:Disconnect() end
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-        flyBodyVel = Instance.new("BodyVelocity")
-        flyBodyVel.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-        flyBodyVel.Velocity = Vector3.new(0, 0, 0)
-        flyBodyVel.Parent = hrp
-        flyConn = run.RenderStepped:Connect(function()
-            if not hrp or not hrp.Parent then return end
-            local vel = Vector3.new(0, 0, 0)
-            local flyspeed = (flyMethod == "Bypass") and 60 or 40
-            if input:IsKeyDown(Enum.KeyCode.W) then vel = vel + (camera.CFrame.LookVector * flyspeed) end
-            if input:IsKeyDown(Enum.KeyCode.S) then vel = vel - (camera.CFrame.LookVector * flyspeed) end
-            if input:IsKeyDown(Enum.KeyCode.A) then vel = vel - (camera.CFrame.RightVector * flyspeed) end
-            if input:IsKeyDown(Enum.KeyCode.D) then vel = vel + (camera.CFrame.RightVector * flyspeed) end
-            flyBodyVel.Velocity = vel
-            if flyMethod == "Bypass" then
-                local event = rp:FindFirstChild("Events") and rp.Events:FindFirstChild("__RZDONL")
-                if event then pcall(function()
-                    event:FireServer("__---r", Vector3.new(0, 0, 0), hrp.CFrame, false)
-                end) end
-            end
-        end)
-    end
-    if me.Character then
-        startFly(me.Character)
-    end
-    me.CharacterAdded:Connect(function(char)
-        repeat wait() until char:FindFirstChild("HumanoidRootPart")
-        startFly(char)
-    end)
-end
-local function disableFly()
-    if flyBodyVel then flyBodyVel:Destroy() end
-    flyBodyVel = nil
-    if flyConn then flyConn:Disconnect() end
-    flyConn = nil
-end
 addToggle("Fly", false, function(enabled)
-    if enabled then enableFly() else disableFly() end
+    if enabled then
+        if me.Character and me.Character:FindFirstChild("HumanoidRootPart") then
+            flyBodyVel = Instance.new("BodyVelocity")
+            flyBodyVel.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+            flyBodyVel.Velocity = Vector3.new(0, 0, 0)
+            flyBodyVel.Parent = me.Character.HumanoidRootPart
+            flyConn = run.RenderStepped:Connect(function()
+                local vel = Vector3.new(0, 0, 0)
+                local flyspeed = (flyMethod == "Bypass") and 60 or 40
+                if input:IsKeyDown(Enum.KeyCode.W) then vel = vel + (camera.CFrame.LookVector * flyspeed) end
+                if input:IsKeyDown(Enum.KeyCode.S) then vel = vel - (camera.CFrame.LookVector * flyspeed) end
+                if input:IsKeyDown(Enum.KeyCode.A) then vel = vel - (camera.CFrame.RightVector * flyspeed) end
+                if input:IsKeyDown(Enum.KeyCode.D) then vel = vel + (camera.CFrame.RightVector * flyspeed) end
+                flyBodyVel.Velocity = vel
+                if flyMethod == "Bypass" then
+                    local event = rp:FindFirstChild("Events") and rp.Events:FindFirstChild("__RZDONL")
+                    if event then event:FireServer("__---r", Vector3.new(0, 0, 0), me.Character.HumanoidRootPart.CFrame, false) end
+                end
+            end)
+        end
+    else
+        if flyBodyVel then flyBodyVel:Destroy() end
+        flyBodyVel = nil
+        if flyConn then flyConn:Disconnect() end
+        flyConn = nil
+    end
 end)
 
 -- Fly Method Dropdown
@@ -236,48 +247,13 @@ flyMethodDropdown.MouseButton1Click:Connect(function()
 end)
 
 -- Infinite Stamina Toggle
-local infStaminaConn
 addToggle("Infinite Stamina", false, function(enabled)
-    if enabled then
-        infStaminaConn = run.RenderStepped:Connect(function()
-            if me.Character and me.Character:FindFirstChild("Humanoid") then
-                me.Character.Humanoid:SetAttribute("ZSPRN_M", true)
-            end
-        end)
-    else
-        if infStaminaConn then infStaminaConn:Disconnect() end
-        infStaminaConn = nil
-        if me.Character and me.Character:FindFirstChild("Humanoid") then
-            me.Character.Humanoid:SetAttribute("ZSPRN_M", nil)
-        end
-    end
+    -- Implement stamina logic here
 end)
 
 -- No Fall Damage Toggle
-local noFallConn
 addToggle("No Fall Damage", false, function(enabled)
-    if enabled then
-        if me.Character then
-            local ff = Instance.new("ForceField")
-            ff.Parent = me.Character
-            ff.Visible = false
-        end
-        noFallConn = me.CharacterAdded:Connect(function(char)
-            local ff = Instance.new("ForceField")
-            ff.Parent = char
-            ff.Visible = false
-        end)
-    else
-        if me.Character then
-            for _, a in pairs(me.Character:GetChildren()) do
-                if a:IsA("ForceField") and a.Visible == false then
-                    a:Destroy()
-                end
-            end
-        end
-        if noFallConn then noFallConn:Disconnect() end
-        noFallConn = nil
-    end
+    -- Implement no fall damage logic here
 end)
 
 -- Noclip Toggle
@@ -301,29 +277,15 @@ end)
 
 -- Fake Down Toggle
 addToggle("Fake Down", false, function(enabled)
-    -- Placeholder: No crash
+    -- Implement fake down logic here
 end)
 
 -- Stop Neck Move Toggle
-local neckConn
 addToggle("Stop Neck Move", false, function(enabled)
-    if enabled then
-        if me.Character then
-            me.Character:SetAttribute("NoNeckMovement", true)
-        end
-        neckConn = me.CharacterAdded:Connect(function(char)
-            char:SetAttribute("NoNeckMovement", true)
-        end)
-    else
-        if me.Character then
-            me.Character:SetAttribute("NoNeckMovement", nil)
-        end
-        if neckConn then neckConn:Disconnect() end
-        neckConn = nil
-    end
+    -- Implement stop neck move logic here
 end)
 
 -- Unbreak Limbs Toggle
 addToggle("Unbreak Limbs", false, function(enabled)
-    -- Placeholder: No crash
+    -- Implement unbreak limbs logic here
 end)
